@@ -1,5 +1,5 @@
 {
-  "name": "xmhai-rss-display",
+  "name": "rss",
   "version": "1.0.0",
   "description": "Cloudflare Worker to display articles from xmhai.cn RSS feed",
   "main": "src/index.ts",
