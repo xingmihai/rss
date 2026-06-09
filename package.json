@@ -1,0 +1,17 @@
+{
+  "name": "xmhai-rss-display",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker to display articles from xmhai.cn RSS feed",
+  "main": "src/index.ts",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240620.0",
+    "typescript": "^5.5.0",
+    "wrangler": "^3.60.0"
+  },
+  "license": "MIT"
+}
