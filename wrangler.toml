@@ -8,5 +8,5 @@ RSS_URL = "https://www.xmhai.cn/rss.xml"
 
 # 可选：配置自定义域名
 # routes = [
-#   { pattern = "your-domain.com", custom_domain = true }
+#   { pattern = "rss.xmhai.cn", custom_domain = true }
 # ]
