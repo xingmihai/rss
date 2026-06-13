@@ -1,79 +1,126 @@
-# xmhai-rss-display
+# RSS 聚合器 (Cloudflare Worker)
 
-Cloudflare Worker 项目 - 获取并展示 [星觅海的博客](https://www.xmhai.cn) RSS 文章。
+一个基于 Cloudflare Worker 的轻量级 RSS 聚合服务，支持多源 RSS 订阅、自动合并排序，并通过 JSON API 返回最新的文章列表。
 
-## 功能
+## 功能特性
 
-- 自动抓取 `https://www.xmhai.cn/rss.xml` 的文章数据
-- 渲染为美观的暗色主题 HTML 页面
-- 提供 `/api/articles` JSON API 接口
-- 响应式设计，支持移动端
-- 卡片动画效果
+- **多源聚合**：支持配置多个 RSS 源 URL，并行获取数据
+- **容错处理**：单个 RSS 源失败不会影响其他源的正常获取
+- **自动排序**：按发布日期自动排序，最新的文章在前
+- **内容清理**：自动去除 HTML 标签，解码 HTML 实体，清理多余空白
+- **跨域支持**：内置 CORS 响应头，支持前端直接调用
+- **轻量高效**：基于 Cloudflare Worker Edge 计算，低延迟全球访问
 
-## 部署步骤
+## 部署方式
 
-### 1. 安装依赖
+### 1. 创建 Worker
 
-```bash
-npm install
+1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com)
+2. 进入 **Workers & Pages** → **创建 Worker**
+3. 将 `index.ts` 中的代码粘贴到编辑器中
+
+### 2. 配置环境变量
+
+在 Worker 的 **Settings** → **Variables** 中添加环境变量：
+
+| 变量名 | 类型 | 说明 | 示例 |
+|--------|------|------|------|
+| `RSS_URLS` | 字符串 | 多个 RSS 源 URL，用逗号分隔 | `https://example.com/rss.xml,https://blog.example.com/feed.xml` |
+
+> **注意**：如果不配置 `RSS_URLS`，将使用默认的 RSS 源：
+> - `https://www.xmhai.cn/rss.xml`
+> - `https://blog.xiaow.qzz.io/rss.xml`
+
+### 3. 部署
+
+点击 **Deploy** 按钮，Worker 将立即上线并可通过分配的 `*.workers.dev` 域名访问。
+
+## API 使用
+
+### 获取文章列表
+
+**请求：**
+```http
+GET https://your-worker.your-subdomain.workers.dev/
 ```
 
-### 2. 本地开发
-
-```bash
-npm run dev
-```
-
-### 3. 部署到 Cloudflare
-
-```bash
-npm run deploy
-```
-
-部署后会得到一个 `*.workers.dev` 的域名，访问即可看到文章列表。
-
-## 配置
-
-### 自定义 RSS 源
-
-编辑 `wrangler.toml` 中的 `RSS_URL` 变量：
-
-```toml
-[vars]
-RSS_URL = "https://your-rss-feed.com/feed.xml"
-```
-
-### 绑定自定义域名
-
-取消 `wrangler.toml` 中 `routes` 的注释并修改为你的域名：
-
-```toml
-routes = [
-  { pattern = "your-domain.com", custom_domain = true }
+**响应：**
+```json
+[
+  {
+    "title": "文章标题",
+    "auther": "RSS 源标题",
+    "date": "2026-06-13",
+    "link": "https://example.com/article",
+    "content": "文章摘要内容..."
+  }
 ]
 ```
 
-## 项目结构
+### 响应字段说明
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `title` | string | 文章标题 |
+| `auther` | string | 来源 RSS 源的标题（作为作者/来源标识） |
+| `date` | string | 发布日期，格式为 `YYYY-MM-DD` |
+| `link` | string | 文章原文链接 |
+| `content` | string | 清理后的文章摘要/描述 |
+
+## 技术细节
+
+### 数据流程
 
 ```
-xmhai-rss-worker/
-├── src/
-│   └── index.ts          # Worker 主逻辑
-├── package.json
-├── wrangler.toml         # Cloudflare 配置
-└── README.md
+请求 → fetchAllRSS() → 并行获取多个 RSS → parseRSS() → 合并排序 → 返回前20篇
 ```
 
-## 技术栈
+### 核心函数
 
-- TypeScript
-- Cloudflare Workers
-- 原生 Web API (fetch, Response)
-- 纯 CSS 样式（无外部依赖）
-
-## 端点
-
-| 路径 | 说明 |
+| 函数 | 说明 |
 |------|------|
-| `/` | HTML 页面，展示文章卡片 |
-| `/api/articles` | JSON API，返回文章数据 |
+| `fetchAllRSS(env)` | 并行获取所有配置的 RSS 源，合并并排序 |
+| `fetchAndParseSingleRSS(url)` | 获取单个 RSS 源并解析 |
+| `parseRSS(xml)` | 解析 RSS XML，提取 Feed 信息和文章列表 |
+| `extractTag(xml, tag)` | 从 XML 中提取指定标签内容 |
+| `decodeHtmlEntities(text)` | 解码 HTML 实体（如 `&amp;` → `&`） |
+| `cleanContent(desc)` | 清理文章内容，去除 HTML 标签和多余空白 |
+| `formatDate(dateStr)` | 格式化日期为 `YYYY-MM-DD` |
+
+### 限制与默认值
+
+- **返回数量**：最多返回最新的 **20 篇** 文章
+- **超时**：依赖 Cloudflare Worker 的默认 fetch 超时（约 30 秒）
+- **RSS 格式**：支持标准 RSS 2.0 格式（`<channel>` + `<item>` 结构）
+
+## 自定义扩展
+
+### 修改返回数量
+
+编辑 `fetchAllRSS` 函数中的切片参数：
+
+```typescript
+return allArticles.slice(0, 50);  // 改为返回 50 篇
+```
+
+### 添加更多 RSS 源
+
+直接在 `RSS_URLS` 环境变量中添加，用逗号分隔：
+
+```bash
+RSS_URLS=https://a.com/rss.xml,https://b.com/feed.xml,https://c.com/rss
+```
+
+### 支持 Atom 格式
+
+如需支持 Atom Feed，可扩展 `parseRSS` 函数，增加对 `<feed>` 和 `<entry>` 标签的解析逻辑。
+
+## 注意事项
+
+1. **RSS 源稳定性**：如果某个 RSS 源长期不可用，建议从 `RSS_URLS` 中移除或替换
+2. **内容长度**：`content` 字段为 RSS 中的 `<description>` 内容，长度取决于 RSS 源的配置
+3. **日期解析**：依赖 RSS 源提供的 `<pubDate>` 格式，标准 RSS 日期格式兼容性最佳
+
+## 许可证
+
+MIT License
