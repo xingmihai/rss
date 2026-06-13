@@ -13,7 +13,7 @@
 
 ## 部署方式
 
-### Cloudflare Wirkers 自动部署
+### Cloudflare Workers 自动部署
 
 [![rss](https://deploy.workers.cloudflare.com/button)](https://dash.cloudflare.com/?to=/:account/workers-and-pages/create/deploy-to-workers&repository=https://github.com/xingmihai/rss)
 
