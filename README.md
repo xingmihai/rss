@@ -42,6 +42,7 @@
 ```http
 GET https://your-worker.your-subdomain.workers.dev/
 ```
+> 也可绑定自定义域名
 
 **响应：**
 ```json
