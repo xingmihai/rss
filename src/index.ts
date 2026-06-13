@@ -26,7 +26,7 @@ export default {
 
 // 获取并解析多个 RSS 源
 async function fetchAllRSS(env: Env): Promise<Article[]> {
-  const rssUrls = (env.RSS_URLS || 'https://www.xmhai.cn/rss.xml,https://blog.xiaow.qzz.io')
+  const rssUrls = (env.RSS_URLS || 'https://www.xmhai.cn/rss.xml,https://blog.xiaow.qzz.io/rss.xml')
     .split(',')
     .map(url => url.trim())
     .filter(url => url.length > 0);
