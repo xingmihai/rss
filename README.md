@@ -29,7 +29,6 @@
 
 > **注意**：如果不配置 `RSS_URLS`，将使用默认的 RSS 源：
 > - `https://www.xmhai.cn/rss.xml`
-> - `https://blog.xiaow.qzz.io/rss.xml`
 
 ### 3. 部署
 
