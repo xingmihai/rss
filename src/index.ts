@@ -1,11 +1,11 @@
 /**
  * xmhai-rss-display
- * Cloudflare Worker - 获取并展示 https://www.xmhai.cn/rss.xml 的文章
- * 纯 JSON API 版本
+ * Cloudflare Worker - 聚合多个 RSS 源并按时间排序
  */
 
 export interface Env {
-  RSS_URL: string;
+  // 多个 RSS 源地址，用逗号分隔
+  RSS_URLS: string;
 }
 
 // 文章数据结构
@@ -15,6 +15,8 @@ interface Article {
   date: string;
   link: string;
   content: string;
+  // 内部用于排序的时间戳
+  _timestamp: number;
 }
 
 // RSS 源信息
@@ -26,17 +28,43 @@ interface FeedInfo {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-
-    // 统一返回 JSON 数据
     return handleApi(env);
   },
 };
 
-// 获取并解析 RSS
-async function fetchAndParseRSS(env: Env): Promise<{ feed: FeedInfo; articles: Article[] }> {
-  const rssUrl = env.RSS_URL || 'https://www.xmhai.cn/rss.xml';
+// 获取并解析所有 RSS 源
+async function fetchAllRSS(env: Env): Promise<Article[]> {
+  // 获取 RSS URL 列表，用逗号分隔
+  const rssUrls = (env.RSS_URLS || 'https://blog.xiaow.qzz.io/rss.xml')
+    .split(',')
+    .map(url => url.trim())
+    .filter(url => url.length > 0);
 
+  // 并发抓取所有 RSS 源
+  const results = await Promise.allSettled(
+    rssUrls.map(url => fetchAndParseSingleRSS(url))
+  );
+
+  // 收集所有成功的文章
+  const allArticles: Article[] = [];
+  
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      allArticles.push(...result.value.articles);
+    } else {
+      console.error(`Failed to fetch RSS source: ${result.reason}`);
+    }
+  }
+
+  // 按时间戳降序排序（最新的在前）
+  allArticles.sort((a, b) => b._timestamp - a._timestamp);
+
+  // 移除内部使用的 _timestamp 字段
+  return allArticles.map(({ _timestamp, ...article }) => article);
+}
+
+// 获取并解析单个 RSS 源
+async function fetchAndParseSingleRSS(rssUrl: string): Promise<{ feed: FeedInfo; articles: Article[] }> {
   const response = await fetch(rssUrl, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (compatible; Cloudflare Worker RSS Reader)',
@@ -44,7 +72,7 @@ async function fetchAndParseRSS(env: Env): Promise<{ feed: FeedInfo; articles: A
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch RSS: ${response.status} ${response.statusText}`);
+    throw new Error(`Failed to fetch RSS: ${rssUrl} - ${response.status} ${response.statusText}`);
   }
 
   const xmlText = await response.text();
@@ -80,16 +108,29 @@ function parseRSS(xml: string): { feed: FeedInfo; articles: Article[] } {
     const content = extractTag(item, 'description') || '';
     const pubDate = extractTag(item, 'pubDate') || '';
 
+    const timestamp = parseTimestamp(pubDate);
+
     articles.push({
       title: decodeHtmlEntities(title),
       auther: feed.title,
       date: formatDate(pubDate),
       link,
       content: cleanContent(content),
+      _timestamp: timestamp,
     });
   }
 
   return { feed, articles };
+}
+
+// 解析时间戳用于排序
+function parseTimestamp(dateStr: string): number {
+  try {
+    const date = new Date(dateStr);
+    return date.getTime();
+  } catch {
+    return 0;
+  }
 }
 
 // 从 XML 中提取标签内容
@@ -136,8 +177,8 @@ function formatDate(dateStr: string): string {
 // 处理 API 请求
 async function handleApi(env: Env): Promise<Response> {
   try {
-    const data = await fetchAndParseRSS(env);
-    return jsonResponse(data.articles);
+    const articles = await fetchAllRSS(env);
+    return jsonResponse(articles);
   } catch (error) {
     return jsonResponse({ error: (error as Error).message }, 500);
   }
