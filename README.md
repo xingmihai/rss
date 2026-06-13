@@ -13,11 +13,9 @@
 
 ## 部署方式
 
-### 1. 创建 Worker
+### Cloudflare Wirkers 自动部署
 
-1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com)
-2. 进入 **Workers & Pages** → **创建 Worker**
-3. 将 `index.ts` 中的代码粘贴到编辑器中
+[![rss](https://deploy.workers.cloudflare.com/button)](https://dash.cloudflare.com/?to=/:account/workers-and-pages/create/deploy-to-workers&repository=https://github.com/xingmihai/rss)
 
 ### 2. 配置环境变量
 
