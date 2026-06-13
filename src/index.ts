@@ -1,8 +1,3 @@
-/**
- * xmhai-rss-display
- * Cloudflare Worker - 多 RSS 源聚合展示
- */
-
 export interface Env {
   RSS_URLS: string;  // 多个 RSS 源 URL，用逗号分隔
 }
@@ -25,14 +20,13 @@ interface FeedInfo {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    // 所有请求都返回 JSON
     return handleApi(env);
   },
 };
 
 // 获取并解析多个 RSS 源
 async function fetchAllRSS(env: Env): Promise<Article[]> {
-  const rssUrls = (env.RSS_URLS || 'https://www.xmhai.cn/rss.xml,https://blog.xiaow.qzz.io/rss.xml')
+  const rssUrls = (env.RSS_URLS || 'https://www.xmhai.cn/rss.xml,https://blog.xiaow.qzz.io')
     .split(',')
     .map(url => url.trim())
     .filter(url => url.length > 0);
@@ -50,7 +44,7 @@ async function fetchAllRSS(env: Env): Promise<Article[]> {
 
   const results = await Promise.all(promises);
   
-  // 合并所有文章并按日期排序（最新的在前）
+  // 合并所有文章并按日期排序（最新的在前），只返回前20篇
   const allArticles = results.flat();
   allArticles.sort((a, b) => {
     const dateA = new Date(a.date);
@@ -58,7 +52,7 @@ async function fetchAllRSS(env: Env): Promise<Article[]> {
     return dateB.getTime() - dateA.getTime();
   });
 
-  return allArticles;
+  return allArticles.slice(0, 20);  // 只返回前20篇
 }
 
 // 获取并解析单个 RSS 源
