@@ -7,13 +7,13 @@ export interface Env {
   RSS_URL: string;
 }
 
-// RSS 文章数据结构
+// 修改后的文章数据结构，匹配新格式
 interface Article {
   title: string;
+  auther: string;  // 注意：原文是 author，但这里按你的要求保留 auther
+  date: string;
   link: string;
-  description: string;
-  pubDate: string;
-  formattedDate: string;
+  content: string;
 }
 
 // RSS 源信息
@@ -81,15 +81,18 @@ function parseRSS(xml: string): { feed: FeedInfo; articles: Article[] } {
     const item = match[1];
     const title = extractTag(item, 'title') || '无标题';
     const link = extractTag(item, 'link') || '#';
-    const description = extractTag(item, 'description') || '';
+    const content = extractTag(item, 'description') || '';  // content 对应原来的 description
     const pubDate = extractTag(item, 'pubDate') || '';
+    
+    // 尝试提取 author，如果没有则留空
+    const auther = extractTag(item, 'author') || extractTag(item, 'dc:creator') || '';
 
     articles.push({
       title: decodeHtmlEntities(title),
+      auther,
+      date: formatDate(pubDate),
       link,
-      description: cleanDescription(description),
-      pubDate,
-      formattedDate: formatDate(pubDate),
+      content: cleanContent(content),
     });
   }
 
@@ -116,16 +119,14 @@ function decodeHtmlEntities(text: string): string {
   return text.replace(/&[^;]+;/g, (entity) => entities[entity] || entity);
 }
 
-// 清理描述文本
-function cleanDescription(desc: string): string {
+// 清理内容文本（保留更多内容，不截断）
+function cleanContent(desc: string): string {
   // 移除 HTML 标签
   let text = desc.replace(/<[^>]*>/g, '');
   // 解码实体
   text = decodeHtmlEntities(text);
-  // 限制长度
-  if (text.length > 200) {
-    text = text.substring(0, 200) + '...';
-  }
+  // 去除多余空白
+  text = text.replace(/\s+/g, ' ').trim();
   return text;
 }
 
@@ -133,23 +134,18 @@ function cleanDescription(desc: string): string {
 function formatDate(dateStr: string): string {
   try {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return date.toISOString().split('T')[0];  // 只返回 YYYY-MM-DD 格式
   } catch {
     return dateStr;
   }
 }
 
-// 处理 API 请求
+// 处理 API 请求 - 返回新的 JSON 格式
 async function handleApi(env: Env): Promise<Response> {
   try {
     const data = await fetchAndParseRSS(env);
-    return jsonResponse(data);
+    // 直接返回 articles 数组，不再包裹 feed 信息
+    return jsonResponse(data.articles);
   } catch (error) {
     return jsonResponse({ error: (error as Error).message }, 500);
   }
@@ -188,7 +184,7 @@ function jsonResponse(data: unknown, status = 200): Response {
   });
 }
 
-// 渲染 HTML 页面
+// 渲染 HTML 页面（保持不变）
 function renderHTML(feed: FeedInfo, articles: Article[], rssUrl: string): string {
   const articleCards = articles
     .map(
@@ -200,8 +196,9 @@ function renderHTML(feed: FeedInfo, articles: Article[], rssUrl: string): string
             ${escapeHtml(article.title)}
           </a>
         </h2>
-        <time class="article-date">${escapeHtml(article.formattedDate)}</time>
-        <p class="article-desc">${escapeHtml(article.description)}</p>
+        <time class="article-date">${escapeHtml(article.date)}</time>
+        ${article.auther ? `<span class="article-author">作者：${escapeHtml(article.auther)}</span>` : ''}
+        <p class="article-desc">${escapeHtml(article.content.substring(0, 200))}...</p>
         <a href="${escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer" class="read-more">
           阅读全文
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -512,7 +509,7 @@ function renderHTML(feed: FeedInfo, articles: Article[], rssUrl: string): string
         <div class="stat-label">篇文章</div>
       </div>
       <div class="stat">
-        <div class="stat-value">${articles[0]?.formattedDate.split(' ')[0] || '-'}</div>
+        <div class="stat-value">${articles[0]?.date || '-'}</div>
         <div class="stat-label">最新更新</div>
       </div>
     </div>
