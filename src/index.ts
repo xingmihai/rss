@@ -1,11 +1,10 @@
 /**
  * xmhai-rss-display
- * Cloudflare Worker - 聚合多个 RSS 源并按时间排序
+ * Cloudflare Worker - 多 RSS 源聚合展示
  */
 
 export interface Env {
-  // 多个 RSS 源地址，用逗号分隔
-  RSS_URLS: string;
+  RSS_URLS: string;  // 多个 RSS 源 URL，用逗号分隔
 }
 
 // 文章数据结构
@@ -15,8 +14,6 @@ interface Article {
   date: string;
   link: string;
   content: string;
-  // 内部用于排序的时间戳
-  _timestamp: number;
 }
 
 // RSS 源信息
@@ -28,39 +25,40 @@ interface FeedInfo {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    // 所有请求都返回 JSON
     return handleApi(env);
   },
 };
 
-// 获取并解析所有 RSS 源
+// 获取并解析多个 RSS 源
 async function fetchAllRSS(env: Env): Promise<Article[]> {
-  // 获取 RSS URL 列表，用逗号分隔
-  const rssUrls = (env.RSS_URLS || 'https://blog.xiaow.qzz.io/rss.xml')
+  const rssUrls = (env.RSS_URLS || 'https://www.xmhai.cn/rss.xml,https://blog.xiaow.qzz.io/rss.xml')
     .split(',')
     .map(url => url.trim())
     .filter(url => url.length > 0);
 
-  // 并发抓取所有 RSS 源
-  const results = await Promise.allSettled(
-    rssUrls.map(url => fetchAndParseSingleRSS(url))
-  );
-
-  // 收集所有成功的文章
-  const allArticles: Article[] = [];
-  
-  for (const result of results) {
-    if (result.status === 'fulfilled') {
-      allArticles.push(...result.value.articles);
-    } else {
-      console.error(`Failed to fetch RSS source: ${result.reason}`);
+  // 并行获取所有 RSS 源
+  const promises = rssUrls.map(async (rssUrl) => {
+    try {
+      const { articles } = await fetchAndParseSingleRSS(rssUrl);
+      return articles;
+    } catch (error) {
+      console.error(`Failed to fetch RSS from ${rssUrl}:`, error);
+      return [];  // 单个源失败不影响其他源
     }
-  }
+  });
 
-  // 按时间戳降序排序（最新的在前）
-  allArticles.sort((a, b) => b._timestamp - a._timestamp);
+  const results = await Promise.all(promises);
+  
+  // 合并所有文章并按日期排序（最新的在前）
+  const allArticles = results.flat();
+  allArticles.sort((a, b) => {
+    const dateA = new Date(a.date);
+    const dateB = new Date(b.date);
+    return dateB.getTime() - dateA.getTime();
+  });
 
-  // 移除内部使用的 _timestamp 字段
-  return allArticles.map(({ _timestamp, ...article }) => article);
+  return allArticles;
 }
 
 // 获取并解析单个 RSS 源
@@ -72,7 +70,7 @@ async function fetchAndParseSingleRSS(rssUrl: string): Promise<{ feed: FeedInfo;
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch RSS: ${rssUrl} - ${response.status} ${response.statusText}`);
+    throw new Error(`Failed to fetch RSS: ${response.status} ${response.statusText}`);
   }
 
   const xmlText = await response.text();
@@ -108,29 +106,16 @@ function parseRSS(xml: string): { feed: FeedInfo; articles: Article[] } {
     const content = extractTag(item, 'description') || '';
     const pubDate = extractTag(item, 'pubDate') || '';
 
-    const timestamp = parseTimestamp(pubDate);
-
     articles.push({
       title: decodeHtmlEntities(title),
       auther: feed.title,
       date: formatDate(pubDate),
       link,
       content: cleanContent(content),
-      _timestamp: timestamp,
     });
   }
 
   return { feed, articles };
-}
-
-// 解析时间戳用于排序
-function parseTimestamp(dateStr: string): number {
-  try {
-    const date = new Date(dateStr);
-    return date.getTime();
-  } catch {
-    return 0;
-  }
 }
 
 // 从 XML 中提取标签内容
