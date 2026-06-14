@@ -4,7 +4,6 @@
 
 ## 功能特性
 
-- **白名单**：支持添加白名单，用于配置允许的来源域名，如果请求没有 Origin 或 Referer 头（比如直接访问），默认放行，方便调试
 - **多源聚合**：支持配置多个 RSS 源 URL，并行获取数据
 - **容错处理**：单个 RSS 源失败不会影响其他源的正常获取
 - **自动排序**：按发布日期自动排序，最新的文章在前
@@ -25,11 +24,9 @@
 | 变量名 | 类型 | 说明 | 示例 |
 |--------|------|------|------|
 | `RSS_URLS` | 字符串 | 多个 RSS 源 URL，用逗号分隔 | `https://example.com/rss.xml,https://blog.example.com/feed.xml` |
-| `ALLOWED_ORIGINS` | 字符串 | 域名白名单 | `xmhai.cn` |
 
 > **注意**：如果不配置 `RSS_URLS`，将使用默认的 RSS 源：
 > - `https://www.xmhai.cn/rss.xml`
-> 未配置白名单时默认允许所有来源
 
 ### 3. 部署
 
@@ -110,13 +107,6 @@ return allArticles.slice(0, 50);  // 改为返回 50 篇
 
 ```bash
 RSS_URLS=https://a.com/rss.xml,https://b.com/feed.xml,https://c.com/rss
-```
-
-### 添加域名白名单
-
-直接在`ALLOWED_ORIGINS` 环境变量中添加 用逗号分隔：
-```bash
-ALLOWED_ORIGINS=a.com,b.com,c.com
 ```
 
 ### 支持 Atom 格式
