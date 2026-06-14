@@ -6,4 +6,4 @@ compatibility_date = "2024-06-20"
 # 自定义 RSS 源 URL（通过环境变量）
 RSS_URLS = "https://www.xmhai.cn/rss.xml"
 # 自定义白名单（通过环境变量）
-ALLOWED_ORIGINS = "https://www.xmhai.cn,https://xmhai.cn"
+ALLOWED_ORIGINS = "xmhai.cn"
