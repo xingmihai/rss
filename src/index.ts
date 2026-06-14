@@ -1,6 +1,5 @@
 export interface Env {
   RSS_URLS: string;  // 多个 RSS 源 URL，用逗号分隔
-  ALLOWED_ORIGINS: string;  // 允许的来源域名，用逗号分隔，例如："https://www.xmhai.cn,https://xmhai.cn"
 }
 
 // 文章数据结构
@@ -21,36 +20,9 @@ interface FeedInfo {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    // 白名单检查
-    const origin = request.headers.get('Origin') || request.headers.get('Referer') || '';
-    if (!isAllowed(origin, env.ALLOWED_ORIGINS)) {
-      return new Response('Forbidden', { 
-        status: 403,
-        headers: { 'Content-Type': 'text/plain' }
-      });
-    }
-    
     return handleApi(env);
   },
 };
-
-// 检查是否在白名单内
-function isAllowed(origin: string, allowedOrigins: string | undefined): boolean {
-  // 如果没有配置白名单，默认允许所有来源
-  if (!allowedOrigins) {
-    return true;
-  }
-  
-  // 如果是直接访问（没有 Origin 和 Referer），也允许
-  if (!origin) {
-    return true;
-  }
-  
-  const origins = allowedOrigins.split(',').map(s => s.trim()).filter(s => s.length > 0);
-  
-  // 检查 origin 是否以白名单中的任意域名开头
-  return origins.some(allowed => origin.startsWith(allowed));
-}
 
 // 获取并解析多个 RSS 源
 async function fetchAllRSS(env: Env): Promise<Article[]> {
@@ -71,7 +43,7 @@ async function fetchAllRSS(env: Env): Promise<Article[]> {
   });
 
   const results = await Promise.all(promises);
-
+  
   // 合并所有文章并按日期排序（最新的在前），只返回前20篇
   const allArticles = results.flat();
   allArticles.sort((a, b) => {
