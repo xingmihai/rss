@@ -24,7 +24,7 @@
 | 变量名 | 类型 | 说明 | 示例 |
 |--------|------|------|------|
 | `RSS_URLS` | 字符串 | 多个 RSS 源 URL，用逗号分隔 | `https://example.com/rss.xml,https://blog.example.com/feed.xml` |
-
+| `ALLOWED_ORIGINS` | 白名单 | 多个白名单用逗号分隔 | `https://www.xmhai.cn` |
 > **注意**：如果不配置 `RSS_URLS`，将使用默认的 RSS 源：
 > - `https://www.xmhai.cn/rss.xml`
 

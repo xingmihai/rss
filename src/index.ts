@@ -181,7 +181,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
   const { allowed, origin } = checkOrigin(request, env);
 
   if (!allowed) {
-    return jsonResponse({ error: 'Forbidden: origin not allowed' }, 403, null);
+    return jsonResponse({ error: '不允许使用原点' }, 403, null);
   }
 
   try {
