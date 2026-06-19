@@ -1,5 +1,6 @@
 export interface Env {
   RSS_URLS: string;  // 多个 RSS 源 URL，用逗号分隔
+  ALLOWED_ORIGINS?: string;  // 允许访问的域名白名单，用逗号分隔（如 https://www.xmhai.cn,https://example.com）
 }
 
 // 文章数据结构
@@ -20,9 +21,30 @@ interface FeedInfo {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    return handleApi(env);
+    return handleApi(request, env);
   },
 };
+
+// 检查请求来源是否在白名单中
+function checkOrigin(request: Request, env: Env): { allowed: boolean; origin: string | null } {
+  const origin = request.headers.get('Origin') || request.headers.get('Referer') || '';
+
+  // 如果没有配置白名单，允许所有来源（兼容原有行为）
+  const allowedOrigins = (env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(o => o.length > 0);
+  if (allowedOrigins.length === 0) {
+    return { allowed: true, origin: '*' };
+  }
+
+  // 检查来源是否在白名单中
+  const isAllowed = allowedOrigins.some(allowed => {
+    // 支持精确匹配或前缀匹配
+    if (origin === allowed) return true;
+    if (origin.startsWith(allowed)) return true;
+    return false;
+  });
+
+  return { allowed: isAllowed, origin };
+}
 
 // 获取并解析多个 RSS 源
 async function fetchAllRSS(env: Env): Promise<Article[]> {
@@ -43,7 +65,7 @@ async function fetchAllRSS(env: Env): Promise<Article[]> {
   });
 
   const results = await Promise.all(promises);
-  
+
   // 合并所有文章并按日期排序（最新的在前），只返回前20篇
   const allArticles = results.flat();
   allArticles.sort((a, b) => {
@@ -154,22 +176,37 @@ function formatDate(dateStr: string): string {
 }
 
 // 处理 API 请求
-async function handleApi(env: Env): Promise<Response> {
+async function handleApi(request: Request, env: Env): Promise<Response> {
+  // 检查域名白名单
+  const { allowed, origin } = checkOrigin(request, env);
+
+  if (!allowed) {
+    return jsonResponse({ error: 'Forbidden: origin not allowed' }, 403, null);
+  }
+
   try {
     const articles = await fetchAllRSS(env);
-    return jsonResponse(articles);
+    return jsonResponse(articles, 200, origin);
   } catch (error) {
-    return jsonResponse({ error: (error as Error).message }, 500);
+    return jsonResponse({ error: (error as Error).message }, 500, origin);
   }
 }
 
 // JSON 响应
-function jsonResponse(data: unknown, status = 200): Response {
+function jsonResponse(data: unknown, status = 200, origin: string | null = '*'): Response {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json; charset=utf-8',
+  };
+
+  // 设置 CORS：如果有白名单则返回具体域名，否则返回 *
+  if (origin) {
+    headers['Access-Control-Allow-Origin'] = origin;
+  }
+  headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS';
+  headers['Access-Control-Allow-Headers'] = 'Content-Type';
+
   return new Response(JSON.stringify(data, null, 2), {
     status,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Access-Control-Allow-Origin': '*',
-    },
+    headers,
   });
 }
